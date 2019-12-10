@@ -1,0 +1,68 @@
+---
+title: "TT_20191210"
+author: "Marisa Henry"
+date: "12/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dslabs)
+library(plotMPR)  # Mathematica plotting package
+library(scales)
+extrafont::loadfonts(device = "win")
+```
+```{r}
+data("temp_carbon")
+df <- temp_carbon %>% 
+  select(year, rel_temp = temp_anomaly, carbon_emissions) %>%
+  filter(year >= 1880, year <= 2014) %>%
+  mutate(temp_fill = if_else(rel_temp < 0, "blue", "red"))
+assertthat::assert_that(sum(is.na(df))== 0)
+```
+
+```{r, fig.width=10, fig.height=6}
+ggplot(df) + 
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0, fill =  paste0(mpr_cols("grey 25"), "40"), color = NA) + 
+  geom_line(aes(x = year, y = carbon_emissions / 10000), color = mpr_cols("grey"), size = 1.4) + 
+  geom_bar(aes(x = year, y = rel_temp, fill = temp_fill), 
+           stat = "identity", color = "white", size = 0.5, width = 1) +
+  geom_hline(aes(yintercept = 0), color = mpr_cols("grey 50")) + 
+  geom_label(data = data.frame(x = 1965, y = 0.75),
+             aes(x = x, y = y, label = "Carbon\nemissions"), 
+             hjust = 0.5, 
+             lineheight = .8, 
+             inherit.aes = FALSE, 
+             label.size = NA,
+             size = 4, 
+             family = "Zilla Slab Medium", 
+             color = mpr_cols("grey")) + 
+  geom_curve(data = data.frame(x = 1970, y = 0.65, xend = 1975, yend = 0.52),
+             mapping = aes(x = x, y = y, xend = xend, yend = yend),
+             colour = mpr_cols("grey"),
+             size = 0.8,
+             curvature = -0.2,
+             arrow = arrow(length = unit(0.02, "npc"), type = "closed"),
+             inherit.aes = FALSE) + 
+  scale_fill_manual(values = c(blue = mpr_cols("dark blue"), 
+                               red = mpr_cols("red")), 
+                    guide = "none") + 
+  scale_x_continuous(limits = c(1879, 2015), 
+                     breaks = c(seq(1880, 2000, 20), 2015), 
+                     expand = c(0,0)) +
+  scale_y_continuous(name  = expression("Global annual mean temperature anomaly ("~degree~"C)"), 
+                     breaks = seq(-0.5, 1, 0.25),
+                     sec.axis = sec_axis(~ . * 10000, 
+                                         breaks = 10000*seq(-0.5, 1, 0.25), 
+                                         label = comma, 
+                                         name = "Annual carbon emissions (millions of metric tons)\n"), 
+                     limits = c(-0.5, 1)) +
+  labs(x = "", 
+       title = "Global temperature anomaly & annual carbon emissions\n\n",
+       caption = "Source: NOAA") + 
+  theme_mpr() +
+  theme(plot.title = element_text(hjust = -0.3))
+
+ggsave(file.path("C:/Users/mhenry/Documents/tidy_tuesday/output", "temp_carbon_20191210.png"), width = 10, height = 6, type = "cairo")
+```
