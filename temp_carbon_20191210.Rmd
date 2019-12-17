@@ -13,6 +13,7 @@ library(plotMPR)  # Mathematica plotting package
 library(scales)
 extrafont::loadfonts(device = "win")
 ```
+
 ```{r}
 data("temp_carbon")
 df <- temp_carbon %>% 
