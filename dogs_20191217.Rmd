@@ -38,7 +38,8 @@ dog_descriptions %>%
         panel.grid.major.x = element_blank(), 
         axis.title.y = element_text(margin = unit(c(0, 2, 0, 0), "lines")))
 
-ggsave(file.path("C:/Users/mhenry/Documents/tidy_tuesday/output", "dogs_20191217.png"), width = 10, height = 6, type = "cairo")
+ggsave(file.path("C:/Users/mhenry/Documents/tidy_tuesday/output", "dogs_20191217.png"), 
+       width = 12, height = 9, type = "cairo")
 ```
 
 

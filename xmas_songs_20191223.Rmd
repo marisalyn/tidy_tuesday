@@ -1,0 +1,63 @@
+---
+title: "Christmas songs"
+author: "Marisa Henry"
+date: "12/23/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(scales)
+extrafont::loadfonts(device = "win")
+```
+
+```{r load_data}
+xmas_songs <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-12-24/christmas_songs.csv")
+```
+
+```{r, fig.height = 8}
+xmas_songs %>% 
+  group_by(year, songid) %>%
+  slice(1) %>%
+  group_by(year) %>%
+  mutate(n = length(unique(songid))) %>%
+  slice(1) %>%
+  ggplot() + 
+  geom_bar(aes(x = year, y = n), stat = "identity", 
+           fill = "#2b6f68CC", color = "#2b6f68", 
+           width = 0.8) + 
+   geom_label(data = data.frame(x = 1997, y = 10.5),
+             aes(x = x, y = y, label = "Michael Buble, Justin Bieber, and the Glee Cast\nreleased Christmas albums in 2010/2011"), 
+             hjust = 0.5, 
+             lineheight = .8, 
+             inherit.aes = FALSE, 
+             label.size = NA,
+             colour = "grey40",
+             size = 3, 
+             family = "Zilla Slab Medium") + 
+  geom_curve(data = data.frame(x = 2008, y = 10.5, xend = 2010.5, yend = 9.2),
+             mapping = aes(x = x, y = y, xend = xend, yend = yend),
+             colour = "grey40",
+             size = 0.7,
+             curvature = -0.2,
+             arrow = arrow(length = unit(0.02, "npc"), type = "closed"),
+             inherit.aes = FALSE) + 
+  theme_minimal(base_family = "Zilla Slab Medium") +
+  scale_y_continuous(breaks = seq(0, 14, 2), 
+                     limits = c(0, 14), 
+                     expand = c(0.005, 0)) + 
+  scale_x_continuous(breaks = seq(1955, 2020, 5), 
+                     expand = c(0.005, 0)) + 
+  labs(x = "", 
+       y = "Number of songs\n", 
+       caption = "Data: Kaggle\nVisualization: @marisalyn", 
+       title = "It's beginning to sound a lot like Christmas", 
+       subtitle = "Number of unique Christmas songs to reach the Billboard 100 by calendar year\n")
+
+ggsave(file.path("C:/Users/mhenry/Documents/tidy_tuesday/output", "xmas_20191224.png"), 
+       width = 8, height = 6, type = "cairo")
+```
+
+
+
