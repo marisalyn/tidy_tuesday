@@ -1,0 +1,122 @@
+---
+title: "Fires"
+author: "Marisa Henry"
+date: "1/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(plotMPR)
+library(patchwork)
+extrafont::loadfonts(device = "win")
+
+rainfall <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/rainfall.csv')
+temperature <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-07/temperature.csv')
+```
+
+```{r filter}
+# filter temp data 
+temperature <-  temperature %>% 
+  mutate(city_name = str_to_sentence(city_name), 
+         year = lubridate::year(date), 
+         month = lubridate::month(date)) %>%
+  filter(temp_type == "max", 
+         city_name == "Melbourne",
+         year >= 1968, year <= 2018) 
+
+# filter rain data
+# make sure there is only data from 1 rainfall station since we will sum
+# rainfall data for each year
+rain_stations <- rainfall %>% 
+  filter(city_name == "Melbourne") %>% 
+  pull(station_name) %>% 
+  unique()
+
+assertthat::assert_that(length(rain_stations) == 1)
+
+rainfall <- rainfall %>% 
+  filter(city_name == "Melbourne", 
+         year >= 1968, year <= 2018)
+```
+
+```{r aggregate}
+rain <- rainfall%>%
+  group_by(year) %>%
+  mutate(annual_rainfall = sum(rainfall, na.rm = TRUE)) %>%
+  filter(annual_rainfall != 0) %>% # assume 0 annual rainfall is just missing data
+  slice(1) 
+
+temp <- temperature%>%
+  group_by(year) %>%
+  mutate(avg_temp = mean(temperature, na.rm = TRUE)) %>%
+  slice(1) 
+
+overall_avg_rainfall <- mean(rain$annual_rainfall)
+overall_avg_temp <- mean(temp$avg_temp)
+```
+
+```{r plot, fig.width = 6, fig.height=5}
+p1 <- ggplot(rain) +
+  geom_hline(aes(yintercept = overall_avg_rainfall), 
+             size = 1.1, color = mpr_cols("grey"), 
+             linetype = "longdash") +
+  geom_bar(aes(x = year, y = annual_rainfall), stat = "identity", 
+           color = mpr_cols("teal"), 
+           fill = paste0(mpr_cols("teal"), "CC")) +
+  scale_x_continuous(limits = c(1967, 2020), 
+                     breaks = seq(1970, 2020, 10)) +
+  scale_y_continuous(limits = c(0, 1000), 
+                     breaks = seq(0, 1000, 250), 
+                     label = paste0(seq(0, 1000, 250), " mm")) +
+  labs(y = "",
+       x = "") + 
+  theme_minimal(base_family = "Zilla Slab Medium") 
+
+p2 <- ggplot(temp) +
+  geom_hline(aes(yintercept = overall_avg_temp), 
+             size = 1.1, color = mpr_cols("grey"), 
+             linetype = "longdash") +
+  geom_line(aes(x = year, y = avg_temp), 
+            size = 1, color = mpr_cols("red")) +
+  geom_point(aes(x = year, y = avg_temp),
+             size = 2, color = mpr_cols("red")) +
+  scale_x_continuous(limits = c(1967, 2020), 
+                     breaks = seq(1970, 2020, 10)) +
+  scale_y_continuous(limits = c(18, 22), 
+                     breaks = seq(18, 22, 2), 
+                     label = paste0(seq(18, 22, 2), "°C")) +
+   geom_label(data = data.frame(x = 2015, y = 18.5),
+             aes(x = x, y = y, label = "50-year average"), 
+             hjust = 0.5, 
+             lineheight = .8, 
+             inherit.aes = FALSE, 
+             label.size = NA,
+             size = 3, 
+             family = "Zilla Slab Medium", 
+             color = mpr_cols("grey")) + 
+  geom_curve(data = data.frame(x = 2015, y = 18.7, xend = 2018, yend = 19.7),
+             mapping = aes(x = x, y = y, xend = xend, yend = yend),
+             colour = mpr_cols("grey"),
+             size = 0.7,
+             curvature = 0.2,
+             arrow = arrow(length = unit(0.02, "npc"), type = "closed"),
+             inherit.aes = FALSE) + 
+  labs(y = "", x = "") + 
+  theme_minimal(base_family = "Zilla Slab Medium") 
+
+p1/p2 + 
+  plot_annotation(title = "Annual total rainfall & average temperature in Melbourne", 
+                  subtitle = str_wrap("Since 2000, total annual rainfall in Melbourne has fallen below average, while average annual maximum temperatures have risen above average. These shifting climatic conditions have exacerabeted bushfires in the area.", 115),
+                  caption = "Source: Australian Bureau of Meterology\nGraphic: @marisalyn", 
+                  theme = theme_minimal(base_family = "Zilla Slab Medium") + 
+                    theme(plot.subtitle = element_text(size = 8)))
+
+ggsave(file.path("C:/Users/mhenry/Documents/tidy_tuesday/output", "aus_20200110.png"), 
+       dpi = 300, width = 6, height = 5, type = "cairo")
+```
+
+
+
