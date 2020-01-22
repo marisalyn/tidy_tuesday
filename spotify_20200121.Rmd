@@ -1,0 +1,106 @@
+---
+title: "Spotify"
+author: "Marisa Henry"
+date: "1/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(scales)
+library(extrafont)
+library(patchwork)
+
+extrafont::loadfonts(device = "win", quiet = TRUE)
+
+spotify <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-21/spotify_songs.csv')
+
+# https://www.soompi.com/article/1369865wpp/spotify-announces-top-k-pop-artists-of-2019-bts-grabs-no-2-on-top-groups-of-2019-chart
+kpop <- c(
+  "bts",
+  "blackpink",
+  "twice",
+  "広瀬大地", # "exo"
+  "red velvet",
+  "seventeen", 
+  "stray kids",
+  "nct 127", 
+  "ikon", 
+  "got7")
+
+# https://www.billboard.com/charts/year-end/pop-songs-artists
+# billoard top 10 pop artists of 2019
+other_pop <- c(
+  "ariana grande", 
+  "post malone",
+  "khalid",
+  "jonas brothers",
+  "halsey",
+  "panic! at the disco",
+  "shawn mendes",
+  "billie eilish", 
+  "lizzo", 
+  "ed sheeran" )
+```
+
+```{r}
+df <- spotify %>% 
+  filter(tolower(track_artist) %in% c(tolower(kpop), tolower(other_pop))) %>%
+  mutate(kpop = if_else(tolower(track_artist) %in% tolower(kpop), 
+                        1, 0), 
+         kpop = factor(kpop)) 
+
+# make sure we got all the artists we expected
+assertthat::assert_that(length(unique(df$track_artist)) == 20)
+
+labels <- data.frame(x = c(0.64, 0.35), 
+                     y = c(3.5, 2.0), 
+                     descrip = c("Energy","Energy"), 
+                     label = c("K-pop songs", "Other top\npop songs"), 
+                     color = c(1, 0)) %>%
+  mutate(color = factor(color))
+
+df %>% 
+  select(kpop, track_artist, danceability, energy, 
+  loudness, speechiness, valence, tempo) %>%
+  mutate(danceability = rescale(danceability), 
+         energy = rescale(energy), 
+         loudness = rescale(loudness), 
+         valence = rescale(valence), 
+         tempo = rescale(tempo)) %>%
+  gather(descrip, value, danceability:tempo) %>%
+  mutate(descrip = str_to_sentence(descrip)) %>%
+  ggplot() + 
+  geom_density(aes(x = value, fill = kpop, color = kpop), size = 1) +
+  geom_label(data = labels,
+             aes(x = x, y = y, label = label, color = color), 
+             hjust = 0.5, 
+             lineheight = .8, 
+             inherit.aes = FALSE, 
+             label.size = NA,
+             size = 3.2, 
+             family = "Zilla Slab Medium") + 
+  scale_color_manual(values = c(`0` = "#5c5c5c",  `1` = "#faa700"))  +
+  scale_fill_manual(values = c(`0` = "#919191CC", `1` = "#FFB319B3")) +  
+  scale_x_continuous(breaks = pretty_breaks(n = 3)) + 
+  scale_y_continuous(breaks = pretty_breaks(n = 3)) + 
+  labs(x = "",  y = "Density\n") +
+  facet_wrap(~descrip, scales = "free_y") +
+  theme_minimal(base_family = "Zilla Slab Medium") + 
+  theme(legend.position = "none", 
+        axis.text = element_text(color = "#5c5c5c", size = 9), 
+        strip.text = element_text(size = 11), 
+        axis.title = element_text(size = 11, color = "#5c5c5c")) + 
+  plot_annotation(title = "K-pop songs bring high energy and high volumes", 
+                  subtitle = str_wrap("\nThe figures below compare the relative distributions of song characteristics between K-pop songs and songs from the Billoard top 10 pop artists of 2019. All characteristics were rescaled to a 0 to 1 scale. K-pop songs tend to be louder and higher energy relative to other pop songs.", 143),
+                  caption = "Source: Spotify // Graphic: @marisalyn // #TidyTuesday", 
+                  theme = theme_minimal(base_family = "Zilla Slab Medium") + 
+                    theme(plot.subtitle = element_text(size = 9, color = "#5c5c5c"), 
+                          plot.caption = element_text(size = 9, color = "#5c5c5c")))
+
+ggsave(file.path("C:/Users/mhenry/Documents/tidy_tuesday/output", "kpop_20200122.png"), 
+       dpi = 300, width = 8, height = 6, type = "cairo")
+```
+
