@@ -1,6 +1,8 @@
 # output
 output/
 
+additional_data
+
 # History files
 .Rhistory
 .Rapp.history

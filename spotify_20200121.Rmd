@@ -55,7 +55,7 @@ df <- spotify %>%
 # make sure we got all the artists we expected
 assertthat::assert_that(length(unique(df$track_artist)) == 20)
 
-labels <- data.frame(x = c(0.64, 0.35), 
+labels <- data.frame(x = c(0.67, 0.35), 
                      y = c(3.5, 2.0), 
                      descrip = c("Energy","Energy"), 
                      label = c("K-pop songs", "Other top\npop songs"), 
@@ -101,6 +101,6 @@ df %>%
                           plot.caption = element_text(size = 9, color = "#5c5c5c")))
 
 ggsave(file.path("C:/Users/mhenry/Documents/tidy_tuesday/output", "kpop_20200122.png"), 
-       dpi = 300, width = 8, height = 6, type = "cairo")
+       dpi = 300, width = 10, height = 5.5, type = "cairo")
 ```
 

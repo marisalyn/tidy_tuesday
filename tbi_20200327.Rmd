@@ -1,0 +1,85 @@
+---
+title: "tbi_20200327"
+author: "Marisa Henry"
+date: "3/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(scales)
+library(plotMPR) #internal package
+library(ggwaffle)
+
+extrafont::loadfonts(device = "win", quiet = TRUE)
+
+update_geom_defaults("text", 
+                     list(hjust = 0.5, 
+                          lineheight = .8,
+                          family = "Zilla Slab Medium", 
+                          color = mpr_cols("green")))
+```
+
+```{r}
+tbi_age <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-24/tbi_age.csv')
+
+age_groups <- c("0-4", 
+                "5-14", 
+                "15-24", 
+                "25-34", 
+                "35-44", 
+                "45-54",  
+                "55-64", 
+                "65-74", 
+                "75+")
+
+injury_mechanisms <- c("Assault" = mpr_cols("red"),
+                       "Intentional self-harm" = mpr_cols("dark blue"), 
+                       "Motor vehicle crashes" = mpr_cols("yellow"), 
+                       "Unintentional falls" = mpr_cols("green"), 
+                       "Uninentionally struck\nby/against object" = mpr_cols("teal"), 
+                       "Other" = mpr_cols("grey 75"))
+
+tbi_age <- tbi_age %>% 
+  filter(age_group != "Total", age_group != "0-17") %>%
+  mutate(age_group = factor(age_group, age_groups), 
+         injury_mechanism = str_to_sentence(injury_mechanism), 
+         injury_mechanism = case_when(
+           grepl("Other", injury_mechanism) ~ "Other", 
+           grepl("struck", injury_mechanism) ~ "Uninentionally struck\nby/against object",
+           TRUE ~ injury_mechanism
+         ), 
+         injury_mechanism = factor(injury_mechanism, names(injury_mechanisms))) %>%
+  group_by(injury_mechanism, type, age_group) %>%
+  mutate(number_est = mean(number_est)) %>%
+  slice(1) %>%
+  group_by(age_group, type) %>%
+  mutate(n_per_age_type = sum(number_est, na.rm = TRUE)) %>%
+  group_by(type) %>%
+  mutate(per = number_est/n_per_age_type*100) %>%
+  ungroup() %>%
+  replace_na(list(per = 0))
+```
+
+```{r, fig.height=8, fig.width=12}
+ggplot() +
+  geom_bar(data = tbi_age, 
+           aes(x = age_group, y = per, fill = injury_mechanism, color = injury_mechanism), 
+          stat = "identity") +
+  facet_wrap(~ type, ncol = 1) + 
+  scale_fill_manual(values = paste0(injury_mechanisms, "CC"), name = "") + 
+  scale_color_manual(values = injury_mechanisms, "CC", name = "") + 
+  scale_y_continuous(limits = c(0, 105), expand = c(0.0, 0.0)) +
+  theme_mpr() +
+  labs(x = "Age group", y = "Percent") +
+  theme(legend.position = "bottom", 
+        panel.grid.major.x = element_blank()) + 
+  coord_cartesian(clip = "off")
+
+ggsave("./output/tbi_20200327.png", width = 6, height = 9, dpi = 600, type = "cairo")
+```
+
+
+

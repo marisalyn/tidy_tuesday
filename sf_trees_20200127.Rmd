@@ -1,0 +1,208 @@
+---
+title: "SF_trees"
+author: "Marisa Henry"
+date: "1/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(extrafont)
+library(sf)
+library(tidycensus)
+library(plotMPR) #internal package
+library(ggthemes)
+library(gridExtra)
+#library(cowplot)
+
+extrafont::loadfonts(device = "win", quiet = TRUE)
+
+update_geom_defaults("text", 
+                     list(hjust = 0.5, 
+                          lineheight = .8,
+                          family = "Zilla Slab Medium", 
+                          color = mpr_cols("green")))
+
+update_geom_defaults("label", 
+                     list(hjust = 0.5, 
+                          lineheight = .8,
+                          family = "Zilla Slab Medium", 
+                          color = mpr_cols("green")))
+```
+
+```{r}
+# load and clean tree data 
+trees <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-01-28/sf_trees.csv')
+
+trees <- trees %>% 
+  separate(species, "::", into = c("species", "name")) %>%
+  mutate(name = if_else(name == "", "Unknown", name)) %>%
+  filter(!grepl("hanging", tolower(site_info)), 
+         legal_status == "DPW Maintained") # only look at DPW maintained trees
+
+top_species <- trees %>%
+  group_by(name) %>%
+  count() %>%
+  ungroup() %>%
+  top_n(50, n) %>%
+  pull(name) %>%
+  trimws()
+
+trees <- trees %>%
+  mutate(species = if_else(trimws(name) %in% top_species, name, "Other"))
+
+# turn into geo data using neighborhoods
+nhoods <- st_read("./additional_data/sf_neighborhoods/geo_export_b9b4bfa3-8367-472c-845e-5e35eb581ace.shp")
+nhoods <- nhoods %>% group_by(nhood) %>% summarise() %>% 
+  filter(nhood != "Treasure Island") 
+
+trees <- trees %>% 
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  filter(latitude < 38.5, latitude > 37.65, abs(longitude < 130)) %>% # handle weird outliers
+  filter(!(latitude > 37.8 & abs(longitude) < 122.38)) 
+
+trees_sf <- trees %>%
+  st_as_sf(coords = c("longitude","latitude")) %>% 
+  st_set_crs(st_crs(nhoods))
+
+# calculate counts per neighborhood
+trees_nhoods <- st_join(nhoods, trees_sf)
+
+n_per_neighborhood <- trees_nhoods %>% 
+  group_by(nhood) %>%
+  count()
+
+st_geometry(n_per_neighborhood) <- NULL
+```
+
+```{r map, fig.width=8, fig.height=12}
+p_map <- ggplot() + 
+  geom_sf(data = nhoods, fill = mpr_cols("white"),
+          color = mpr_cols("grey 50"), 
+          size = 0.7) +
+  geom_sf(data = trees_sf, color = paste0(mpr_cols("green"), "14"), 
+          size = 0.75) +
+  theme_map() + 
+  theme(plot.margin = unit(c(0,0, 0,0), "lines"))
+
+ggsave("output/sf_map_20200127.png", p_map, dpi = 600, width = 8, height = 8, type = "cairo")
+```
+
+```{r planted}
+n_trees_planted <- trees %>% 
+  mutate(year = year(date)) %>%
+  filter(year >= 2015, year <= 2019) %>%
+  group_by(year) %>%
+  mutate(n = n()) %>% 
+  slice(1)
+
+p_planted <- ggplot(n_trees_planted) + 
+  geom_bar(aes(x = year, y = n), 
+           stat = "identity", 
+           fill = mpr_cols("green"), 
+           color = mpr_cols("green"), size = 0.7, width = 0.7) +
+  geom_label(aes(x = year, y = n+150, label = comma(n)), size = 4.2, label.size = NA) + 
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, 1800)) +
+  scale_x_continuous(breaks = seq(2010, 2020, 1)) +
+  labs(x = "", y = "", 
+       title = "NUMBER OF TREES PLANTED", 
+       subtitle = paste0("TOTAL SINCE 2015: ", comma(sum(n_trees_planted$n)))) + 
+  theme_minimal(base_family = "Montserrat") + 
+  theme(axis.text.y = element_blank(), 
+        panel.grid.major.x = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        axis.text.x = element_text(color = mpr_cols("grey"), size = 11), 
+        plot.title = element_text(color = mpr_cols("grey"), face = "bold"), 
+        plot.subtitle = element_text(color = mpr_cols("grey"), size = 11))
+
+ggsave("output/sf_planted_20200127.png", p_planted, dpi = 600, width = 4, height = 3, type = "cairo")
+```
+
+```{r nhood}
+p_nhood <- n_per_neighborhood %>% 
+  ungroup() %>%
+  top_n(20, n) %>%
+  mutate(nhood = if_else(grepl("Financial", nhood), "Financial District", as.character(nhood))) %>%
+  ggplot() + 
+  geom_bar(aes(x = reorder(nhood, n), y = n), 
+           stat = "identity", fill = mpr_cols("green"), 
+           color = mpr_cols("green"), size = 1.5, width = 0.3) +
+  geom_label(aes(x = reorder(nhood, n), y = n+1800, label = comma(n)), 
+             size = 4, label.size = NA) + 
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, 14000)) +
+  coord_flip() + 
+  labs(x = "", y = "",  title = "TREES BY NEIGHBORHOOD") +
+  theme_minimal(base_family = "Montserrat") + 
+  theme(axis.text.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(), 
+        axis.text.y = element_text(color = mpr_cols("grey"), size = 10), 
+        plot.title = element_text(color = mpr_cols("grey"), face = "bold", hjust = -4), 
+        plot.subtitle = element_text(color = mpr_cols("grey"), size = 9))
+
+ggsave("output/sf_nhoods_20200127.png", p_nhood, dpi = 600, width = 5, height = 5, type = "cairo")
+```
+
+```{r species}
+n_per_species <- trees %>% 
+  group_by(species) %>%
+  filter(species != "Unknown", 
+         species != "Other") %>%
+  count() %>%
+  ungroup() %>%
+  top_n(10, n)
+  
+p_species <- ggplot(n_per_species) + 
+  geom_bar(aes(x = reorder(species, n), y = n), 
+           stat = "identity", 
+           fill = mpr_cols("green"), 
+           color = mpr_cols("green"), size = 1.5, width = 0.8) +
+  geom_label(aes(x = reorder(species, n), y = n+900, label = comma(n)), 
+             size = 4.2, label.size = NA) + 
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, 12000)) +
+  labs(x = "", y = "Number of trees") + 
+  coord_flip() + 
+  labs(x = "", y = "",  title = "MOST COMMON SPECIES\n") +
+  theme_minimal(base_family = "Montserrat") + 
+  theme(axis.text.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(), 
+        axis.text.y = element_text(color = mpr_cols("grey"), size = 10), 
+        plot.title = element_text(color = mpr_cols("grey"), face = "bold"), 
+        plot.subtitle = element_text(color = mpr_cols("grey"), size = 9))
+
+```
+
+```{r}
+# https://sfpublicworks.org/trees
+
+p_text <- ggplot(data.frame(x = 1, y = 1)) +
+  labs(title = paste0(str_wrap('San Francisco has approximately 140,000 street trees maintained by the San Francisco Department of Public Works. This may sound like a lot, but the urban tree canopy covers less than 15% of the land area when viewed from above, one of the smallest of any large U.S. city. Additionally, the rate of removal of trees due to age and safety concerns is outpacing the rate of planting, resulting in a decline in the urban forest.', 100 ), "\n\n",
+str_wrap('To combat this decline, San Francisco Public Works, the Urban Forestry Council, and Friends of the Urban Forest, came togetherin 2015 to create the ctiy\'s Urban Forest Plan, a "long-term vision and strategy to improve the health and sustainability of the City’s urban forest". One goal of the plan was to increase the number of street trees, aiming for an increase of 2,500 trees per year. Unfortunately, the City has been falling short of this goal as the number of trees planted falls short of overcoming the number of trees removed.', 100 ))) + 
+  theme_void(base_family = "Montserrat", base_size = 9) + 
+  theme(plot.margin = unit(c(1, 0, 1, 0), "lines"), 
+        plot.title = element_text(lineheight = 1.2, color = mpr_cols("grey")))
+
+p_title <- ggplot(data.frame(x = 1, y = 1)) +
+  labs(title = bquote('SAN FRANCISCO' ~ bold('STREET TREES'))) + 
+  theme_void(base_family = "Montserrat", base_size = 16) + 
+  theme(plot.margin = unit(c(1, 0, 1, 0), "lines"), 
+        plot.title = element_text(lineheight = 1.2, color = mpr_cols("green")))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
