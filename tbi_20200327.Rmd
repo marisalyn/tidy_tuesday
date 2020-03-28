@@ -39,16 +39,25 @@ injury_mechanisms <- c("Assault" = mpr_cols("red"),
                        "Intentional self-harm" = mpr_cols("dark blue"), 
                        "Motor vehicle crashes" = mpr_cols("yellow"), 
                        "Unintentional falls" = mpr_cols("green"), 
-                       "Uninentionally struck\nby/against object" = mpr_cols("teal"), 
+                       "Uninentionally struck by/against object" = mpr_cols("teal"), 
                        "Other" = mpr_cols("grey 75"))
+
+types <- c("Emergency department visit", 
+           "Hospitalizations", 
+           "Deaths")
 
 tbi_age <- tbi_age %>% 
   filter(age_group != "Total", age_group != "0-17") %>%
+  group_by(type) %>%
+  mutate(n_by_type = comma(round(sum(number_est, na.rm = TRUE), 0))) %>%
+  ungroup() %>%
   mutate(age_group = factor(age_group, age_groups), 
+         type = str_to_sentence(type), 
+         type = paste0(type, " (N = ", n_by_type, ")"),
          injury_mechanism = str_to_sentence(injury_mechanism), 
          injury_mechanism = case_when(
            grepl("Other", injury_mechanism) ~ "Other", 
-           grepl("struck", injury_mechanism) ~ "Uninentionally struck\nby/against object",
+           grepl("struck", injury_mechanism) ~ "Uninentionally struck by/against object",
            TRUE ~ injury_mechanism
          ), 
          injury_mechanism = factor(injury_mechanism, names(injury_mechanisms))) %>%
@@ -60,7 +69,14 @@ tbi_age <- tbi_age %>%
   group_by(type) %>%
   mutate(per = number_est/n_per_age_type*100) %>%
   ungroup() %>%
-  replace_na(list(per = 0))
+  replace_na(list(per = 0)) 
+
+types <- c(unique(tbi_age$type)[grepl("Emergency", unique(tbi_age$type))], 
+          unique(tbi_age$type)[grepl("Hosp", unique(tbi_age$type))],
+          unique(tbi_age$type)[grepl("Death", unique(tbi_age$type))])
+
+tbi_age <- tbi_age %>%
+  mutate(type = factor(type, types))
 ```
 
 ```{r, fig.height=8, fig.width=12}
@@ -73,13 +89,25 @@ ggplot() +
   scale_color_manual(values = injury_mechanisms, "CC", name = "") + 
   scale_y_continuous(limits = c(0, 105), expand = c(0.0, 0.0)) +
   theme_mpr() +
-  labs(x = "Age group", y = "Percent") +
+  labs(x = "Age group", y = "Percent", 
+       caption = "Data: CDC (2014) \nVisualization: @marisalyn", 
+       title = "Traumatic brain injuries in 2014",
+       subtitle = "The cause and impact of traumatic brain injuries vary by age\n") +
   theme(legend.position = "bottom", 
-        panel.grid.major.x = element_blank()) + 
-  coord_cartesian(clip = "off")
+        panel.grid.major.x = element_blank(), 
+        strip.text = element_text(size = 10)) + 
+  coord_cartesian(clip = "off") + 
+  guides(col = guide_legend(nrow = 3), 
+         fill = guide_legend(nrow = 3))
 
-ggsave("./output/tbi_20200327.png", width = 6, height = 9, dpi = 600, type = "cairo")
+ggsave("./output/tbi_20200327.png", width = 7, height = 9, dpi = 600, type = "cairo")
 ```
 
+```{r}
+ggplot() +
+  geom_area(data = tbi_age, aes(x = age_group, y = per, group = injury_mechanism,  fill = injury_mechanism)) +
+  theme_mpr() + 
+  theme(legend.position = "none")
+```
 
 
