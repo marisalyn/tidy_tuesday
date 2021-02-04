@@ -1,0 +1,123 @@
+---
+title: "HBCUs"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(janitor)
+library(ggtext)
+library(patchwork)
+extrafont::loadfonts(device = "win")
+
+bach <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-02/bach_students.csv') %>% janitor::clean_names()
+
+hs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-02/hs_students.csv') %>% janitor::clean_names()
+
+hbcu <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-02/hbcu_all.csv') %>% janitor::clean_names()
+
+```
+
+
+```{r, warning = FALSE}
+df <- bind_rows(
+  bach %>% mutate(degree = "Bachelors"),
+  hs %>% mutate(degree = "HS")
+  ) %>%
+  rename(year = total) %>%
+  #filter(year >= 2005) %>%
+  select(
+    -contains("standard_errors"), 
+    -total_asian_pacific_islander
+    ) %>%
+  select(-total_percent_of_all_persons_age_25_and_over) %>%
+  mutate(across(-c(degree), as.numeric)) %>%
+  pivot_longer(
+    cols = -c(degree, year), 
+    names_to = "race_ethnicity", 
+    values_to = "percent"
+    ) %>%
+  mutate(race_ethnicity = case_when(
+    race_ethnicity == "white1" ~ "White",
+    race_ethnicity == "black1" ~ "Black",
+    race_ethnicity == "hispanic" ~ "Hispanic",
+    race_ethnicity == "asian_pacific_islander_asian" ~ "Asian",
+    race_ethnicity == "asian_pacific_islander_pacific_islander" ~ "Pacific Islander",
+    race_ethnicity == "american_indian_alaska_native" ~ "American Indian/ Alaska Native",
+    race_ethnicity == "two_or_more_race" ~ "Two or more races",
+    TRUE ~ race_ethnicity
+  )) %>%
+  filter(!is.na(percent))
+```
+
+```{r, fig.width = 10}
+# quick look at the data
+ggplot(df) +
+  geom_line(
+    aes(x = year, y = percent, color = race_ethnicity),
+    size = 1.2
+    ) + 
+  scale_y_continuous(limits = c(0, 100)) + 
+  facet_wrap(~degree, nrow = 2) + 
+  theme_minimal() + 
+  theme(legend.position = "bottom")
+```
+
+```{r}
+plot_df <- df %>% 
+  filter(race_ethnicity %in% c("Black", "White"), year >= 1985) %>%
+  mutate(
+    degree_race = paste0(degree, "_", race_ethnicity), 
+    percent = percent/100
+    ) %>%
+  rename(race = race_ethnicity)
+
+ggplot() + 
+  geom_line(
+    data = plot_df,
+    aes(x = year, y = percent, color = race, group = degree_race, linetype = degree),
+    size = 1.1
+    ) + 
+  geom_label(
+     aes(x = 2018.7, y = .9, label = "High school\ndegree"), 
+     hjust = 0.5,
+     lineheight = .8, 
+     inherit.aes = FALSE, 
+     label.size = NA,
+     colour = "#636363",
+     size = 3.3, 
+     family = "Segoe UI"
+     ) + 
+  geom_label(
+     aes(x = 2018.7, y = .3, label = "Bachelors\ndegree"), 
+     hjust = 0.5,
+     lineheight = .8, 
+     inherit.aes = FALSE, 
+     label.size = NA,
+     colour = "#636363",
+     size = 3.3, 
+     family = "Segoe UI"
+     ) +
+  labs(
+    title = "<span>Percent of people aged 25+ attaining bachelors and high school degrees</span>",
+    subtitle = "<span style = 'color: #636363; font-size:10pt'>
+    </span>",
+    caption = "\n\nSource: National Center for Education Statistics | Viz: @marisalyn"
+    ) + 
+  scale_color_manual(values = c("Black" = "#ED7000", "White" = "#636363"), name = "") +
+  scale_linetype_manual(values =  c("Bachelors" = "longdash", "HS" = "solid"), guide = "none") +
+  scale_x_continuous(limits = c(1985, 2020)) + 
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) + 
+  theme_minimal(base_family = "Segoe UI") +
+  theme(
+    legend.position = "none", 
+    axis.title = element_blank(),
+    plot.title = element_markdown(family = "Segoe UI", color = "#636363"),
+    plot.subtitle = element_markdown(family = "Segoe UI"),
+    plot.caption = element_text(family = "Segoe UI", color = "#636363")
+    )
+
+```
+
