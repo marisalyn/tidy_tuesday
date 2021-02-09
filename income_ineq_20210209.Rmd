@@ -1,0 +1,199 @@
+---
+title: "Income inequality"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(assertthat)
+library(ggridges)
+library(ggtext)
+library(patchwork)
+extrafont::loadfonts(device = "win", quiet = T)
+
+income <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_mean.csv")
+income_agg <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_aggregate.csv")
+
+quintile_levels = c(
+  "Lowest", 
+  "Second", 
+  "Third", 
+  "Fourth",
+  "Highest"
+)
+
+dark_grey = "#444444"
+grey = "#636363"
+light_grey = "#A1A1A1"
+red = "#E34642"
+
+update_geom_defaults(
+  "label", 
+  list(hjust = 0, 
+       vjust = 0.5,
+       lineheight = .9,
+       family = "Segoe UI", 
+       color = dark_grey)
+  )
+```
+
+
+```{r}
+# Share of aggregate income received by each fifth and top 5% of each racial group/household.
+income_agg_plot_df <- income_agg %>%
+  filter(race == "All Races", income_quintile != "Top 5%") %>%
+  mutate(
+    income_quintile = factor(income_quintile, ordered = TRUE, levels = rev(quintile_levels)), 
+    income_share = income_share/100,
+    fill = if_else(income_quintile == "Highest", "red", "grey")
+    ) 
+
+first_year <- min(income_agg_plot_df$year)
+last_year <- max(income_agg_plot_df$year)
+income_agg_title <- "**Share of aggregate household income, by quintile**\n"
+
+add_quintile_label <- function(plot, x, y, label){
+  plot <- plot + 
+    geom_label(
+      aes(x = x + 1, y = y, label = label), 
+      label.size = NA, size = 3.5
+    ) + 
+    geom_segment(
+      aes(x = x-0.5, xend = x + 0.5, y = y, yend = y), 
+      color = dark_grey
+    ) 
+  return(plot)
+}
+
+p_agg <- ggplot() + 
+  geom_area(
+    data = income_agg_plot_df,
+    aes(x = year, y = income_share, group = income_quintile, fill = fill)
+    ) + 
+  geom_line(
+    data = income_agg_plot_df,
+    aes(x = year, y = income_share, group = income_quintile), 
+    position="stack", color = "white", size = 1.2
+    ) + 
+  labs(title = income_agg_title) + 
+  scale_x_continuous(
+    expand = c(0,0), 
+    breaks = c(first_year, 1980, 2000, last_year), 
+    limits = c(first_year, last_year + 8)
+  ) + 
+  scale_y_continuous(
+    expand = c(0,0), 
+    breaks = c(0.25, 0.5, 0.75, 1),  
+    labels = c("25", "50", "75", "100%")
+  ) + 
+  scale_fill_manual(values= c("red" = red, "grey" = light_grey)) +
+  coord_cartesian(clip = "off") + 
+  theme_minimal(base_family = "Segoe UI") + 
+  theme(
+    legend.position = "none",
+    plot.title = element_markdown(size = 12, color = dark_grey), 
+    axis.text = element_text(size = 10, color = grey), 
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    axis.ticks = element_line(color = light_grey, size = 0.5), 
+    axis.ticks.length = unit(.2, "cm"), 
+    plot.margin = margin(10, 30, 10, 10)
+    )
+
+p_agg <- add_quintile_label(p_agg, x=last_year, y=0.55, label = "Top 20%")
+p_agg <- add_quintile_label(p_agg, x=last_year, y=0.18, label = "Middle 20%")
+p_agg <- add_quintile_label(p_agg, x=last_year, y=0.015, label = "Bottom 20%")
+```
+
+```{r}
+income_plot_df <- income %>%
+  filter(dollar_type == "2019 Dollars", race == "All Races", income_quintile != "Top 5%") %>%
+  mutate(
+    income_quintile = if_else(income_quintile == "Middle", "Third", income_quintile), 
+    income_quintile = factor(income_quintile, ordered = TRUE, levels = quintile_levels), 
+    fill = if_else(income_quintile == "Highest", "red", "grey")
+  )
+
+first_year <- min(income_plot_df$year)
+last_year <- max(income_plot_df$year)
+income_title <- "**Mean household income in 2019 dollars, by quintile**\n"
+
+p_inc <- ggplot() + 
+  geom_line(
+    data = income_plot_df, 
+    aes(x = year, y = income_dollars, color = fill, group = income_quintile), 
+    size = 1.1
+    ) + 
+  labs(title = income_title) + 
+  scale_x_continuous(
+    expand = c(0,0), 
+    breaks = c(first_year, 1980, 2000, last_year), 
+    limits = c(first_year, last_year + 10)
+  ) + 
+  scale_y_continuous(
+    breaks = seq(0, 250000, 50000),
+    labels = scales::dollar
+  ) +  
+  scale_color_manual(values= c("red" = red, "grey" = light_grey)) +
+  coord_cartesian(clip = "off") + 
+  theme_minimal(base_family = "Segoe UI") + 
+  theme(
+    legend.position = "none",
+    plot.title = element_markdown(size = 12, color = dark_grey), 
+    axis.text = element_text(size = 10, color = grey), 
+    axis.title = element_blank(),
+    panel.grid.major = element_line(color = "#E9E9E9"),
+    panel.grid.minor = element_blank(),
+    axis.ticks = element_line(color = light_grey, size = 0.5), 
+    axis.ticks.length = unit(.2, "cm"), 
+    plot.margin = margin(10, 10, 10, 30)
+    )
+
+y_vals <- income_plot_df %>%
+  filter(year == last_year) %>%
+  select(income_quintile, income_dollars)
+
+p_inc <- add_quintile_label(
+  p_inc, x=last_year+0.5, label = "Top 20%",
+  y=filter(y_vals, income_quintile == "Highest")$income_dollars
+  )
+
+p_inc <- add_quintile_label(
+  p_inc, x=last_year+0.5, label = "Middle 20%",
+  y=filter(y_vals, income_quintile == "Third")$income_dollars
+  )
+
+p_inc <- add_quintile_label(
+  p_inc, x=last_year+0.5, label = "Bottom 20%",
+  y=filter(y_vals, income_quintile == "Lowest")$income_dollars
+  )
+```
+
+
+```{r, fig.width=12}
+final_plot <- p_inc + p_agg + plot_annotation(
+  title = "<span>**THE RICH GET RICHER**</span>",
+  subtitle = paste0("<span>Income inequality in the U.S. has consistently risen over the last 50 years. 
+    In 2019, the <span style='color:#E34642;'>**top 20% of households**</span> earned on average ", 
+    scales::dollar(filter(y_vals, income_quintile == "Highest")$income_dollars), 
+    " per year,<br>totalling more than 50 percent of all income earned by US households that year.", 
+    " By contrast, households in the bottom quintile earned on average<br>", 
+    scales::dollar(filter(y_vals, income_quintile == "Lowest")$income_dollars), 
+    " per year, totalling just ", 
+    round(filter(income_agg_plot_df, income_quintile == "Lowest", year == 2019)$income_share*100, 1),
+    " percent of all household income.
+    <br></span>"), 
+  caption = "<br> <br> Source: Urban Institute  & U.S. Census | #TidyTuesday | Viz: @marisalyn", 
+  theme = theme(
+    plot.title = element_markdown(family = "Segoe UI", size = 18, color = dark_grey), 
+    plot.subtitle = element_markdown(family = "Segoe UI", size = 12, color = dark_grey, lineheight = 1.3), 
+    plot.caption = element_markdown(family = "Segoe UI", size = 10, color = dark_grey)
+    )
+)
+
+ggsave("output/income_ineq_20210209.png", plot = final_plot, type = "cairo", width = 12, height = 6, units = "in")
+```
+
+
+
