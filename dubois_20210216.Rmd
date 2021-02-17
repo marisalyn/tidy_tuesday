@@ -1,0 +1,215 @@
+---
+title: "dubois"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(janitor)
+library(magick)
+library(patchwork)
+library(extrafont)
+library(pBrackets)
+extrafont::loadfonts(device = "win", quiet = TRUE)
+
+income <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-16/income.csv') %>% clean_names()
+
+income_levels = c(
+  "$100-200", "$200-300", "$300-400", "$400-500", 
+  "$500-750", "$750-1000", "Over $1000"
+)
+
+category_levels = c("rent", "food", "clothes", "tax", "other")
+
+orig_image <- magick::image_read("https://github.com/ajstarks/dubois-data-portraits/blob/master/challenge/challenge05/original-plate-31.jpg")
+
+```
+
+```{r}
+plot_df <-income %>%
+  mutate(
+    other = if_else(class == "$100-200", 9.9, other), 
+    tax=if_else(class == "$100-200", 0.1, tax)
+    ) %>%
+  pivot_longer(
+    cols = -c(class, actual_average), 
+    names_to = "category", 
+    values_to = "value"
+  ) %>%
+  mutate(
+    class = factor(class, ordered = T, levels = rev(income_levels)), 
+    category=factor(category, ordered = T, levels = rev(category_levels)), 
+    percent = value/100
+    ) %>%
+  group_by(class) %>%
+  arrange(desc(category)) %>%
+  mutate(
+    cum_percent = cumsum(percent),
+    label = if_else(percent > 0.01, scales::percent(percent, accuracy=1), ""), 
+    label_loc = if_else(category == "rent", 0.5*percent, 0.5*percent + lag(cum_percent, 1))
+    ) %>%
+  group_by(category) %>%
+  arrange(class) %>%
+  mutate(
+    next_class = lead(class, 1),
+    next_cum_percent = if_else(category == "other", NA_real_, lead(cum_percent, 1)),
+    next_cum_percent = if_else(next_cum_percent == 0, NA_real_, next_cum_percent)
+    ) %>%
+  ungroup()
+
+class_labels <- plot_df %>% 
+  select(class, actual_average) %>%
+  group_by(class, actual_average) %>% 
+  slice(1) %>%
+  mutate(actual_average = scales::dollar(actual_average))
+
+first_class <- plot_df %>% 
+  filter(class == income_levels[1]) %>% 
+  select(category, cum_percent)
+
+category_labels <- plot_df %>% 
+  select(category) %>%
+  group_by(category) %>% 
+  slice(1) %>%
+  ungroup() %>%
+  arrange(desc(category)) %>%
+  mutate(p = 0.2, percent = cumsum(p)) %>%
+  left_join(., first_class, by="category") %>%
+  rename(next_cum_percent = cum_percent, cum_percent = percent)
+```
+
+```{r, fig.width=9, fig.height=7}
+width <- 0.5
+black <- "#222222"
+left <- -0.39
+middle <- -0.22
+right <- -0.05
+arrow_end <- 0.03
+n <- length(income_levels) 
+
+bracketsGrob <- function(...){
+l <- list(...)
+e <- new.env()
+e$l <- l
+  grid:::recordGrob(  {
+    do.call(grid.brackets, l)
+  }, e)
+}
+
+update_geom_defaults( "text", list( family="Gill Sans MT Condensed", color = black))
+
+
+p <- ggplot(plot_df) + 
+  # primary bars
+  geom_col(
+    aes(x=class, y=percent, fill = category),
+    width = width, color = black, alpha = 0.85
+    ) + 
+  geom_text(
+    aes(
+      x=class, y=label_loc, label = label,
+      color = if_else(category == "rent", "white", "black"), 
+      family="Gill Sans MT", fontface = "bold"
+      )
+    ) + 
+  geom_segment(
+    aes(
+      x=as.numeric(class)+0.5*width, 
+      xend=as.numeric(next_class)-0.5*width, 
+      y=cum_percent, 
+      yend=next_cum_percent
+      ), 
+    color = "#222222", size = 0.5) +
+  # legend
+  geom_col(
+    data = category_labels, 
+    aes(x=n + 1, y=p, fill = category),
+    width = width/3, color = black, alpha = 0.85
+    ) + 
+  geom_segment(
+    data = category_labels,
+    aes(
+      x=n + 1 - 0.33*0.5*width, 
+      xend=n+0.5*width, 
+      y=cum_percent, 
+      yend=next_cum_percent
+      ), 
+    color = black, size = 0.5
+    ) +
+  # axis labels
+  geom_segment(
+    aes(
+      x=as.numeric(class)+width, 
+      xend=as.numeric(class)+width, 
+      y=left, 
+      yend=arrow_end
+      ),
+    arrow = arrow(length = unit(0.15, "cm"))
+    ) + 
+  geom_segment( 
+    aes(x=width, xend=width, y=left, yend=arrow_end),
+    arrow = arrow(length = unit(0.15, "cm"))
+  ) + 
+  geom_segment(aes(x=n+width+0.25, xend=n+width+0.25, y=left, yend=right)) + 
+  geom_segment(aes(x=width, xend=n+width+0.25, y=right, yend=right)) + 
+  geom_segment(aes(x=width, xend=n+width+0.25, y=middle, yend=middle)) +
+  geom_segment(aes(x=width, xend=n+width+0.25, y=left, yend=left)) +
+  geom_text(
+    data = class_labels, 
+    aes(x=class, y=(left+middle)/2, label = class, family="Gill Sans MT")
+    ) + 
+  geom_text(
+    data = class_labels, 
+    aes(x=class, y=(middle+right)/2, label = actual_average, family="Gill Sans MT")
+    ) + 
+  # text annotations
+  annotate("text", x=n+width+0.125, y=(middle+left)/2, label = "CLASS") + 
+  annotate("text", x=n+width+0.125, y=(middle+right)/2, label = "ACTUAL AVERAGE") + 
+  annotate("text", x=n-1+width, y=1.08,label = "POOR.", angle=90, size=4.5) + 
+  annotate("text", x=n-3+width, y=1.08,label = "FAIR.", angle=90, size=4.5) +
+  annotate("text", x=n-5+width, y=1.08, label = "COMFORTABLE.", angle=90, size=4.5) +
+  annotate("text", x=n-6.5+width, y=1.08, label = "WELL-TO-DO.", angle=90, size=4.5) +
+  annotate("text", x=n+1+0.5*width, y=0.1, label="RENT.") + 
+  annotate("text", x=n+1+0.5*width, y=0.3, label="FOOD.") +
+  annotate("text", x=n+1+0.5*width, y=0.5, label="CLOTHES.", ) +
+  annotate("text", x=n+1+0.5*width, y=0.7, label="DIRECT TAXES.") +
+  annotate("text", x=n+1.1+0.5*width, y=0.9, label="OTHER EXPENSES\nAND SAVINGS.", lineheight=0.8) +
+  annotate("text", x=n+3, y=(1.08+left)/2, lineheight=2, size = 7, hjust = 0.5,
+           label="\nINCOME AND EXPENDITURE OF 150 NEGRO FAMILIES IN ATLANTA, GA., U.S.A.") + 
+  annotate("text", x=-1, y=1, lineheight=2, hjust=1,
+           label="Source: W.E.B. Du Bois | #DuBoisChallenge | #TidyTuesday | @marisalyn\n") +
+  # colors and theme
+  scale_fill_manual(
+    values = c("rent" = black, "food" = "#B19CD9","clothes" = "#ffc0cb", "tax"  = "#A1A1A1", "other" = "#E9E9E9")
+    ) + 
+  scale_color_manual(values = c("black" = black, "white" = "white")) + 
+  coord_flip(clip = "off") + 
+  theme_void() +
+  theme(
+    legend.position = "none", 
+    plot.background  = element_rect(fill = "#F6F3E7", color = "#F6F3E7", inherit.blank = FALSE),
+    panel.background = element_rect(fill = "#F6F3E7", color = "#F6F3E7", inherit.blank = FALSE)
+    )
+
+# add brackets at the very end since they're in units of npc (which is annoying!)
+b1 <- bracketsGrob(0.91, 0.75, 0.91, 0.61, h=0.04, lwd=1, col=black)
+b2 <- bracketsGrob(0.91, 0.57, 0.91, 0.43, h=0.04, lwd=1, col=black)
+b3 <- bracketsGrob(0.91, 0.39, 0.91, 0.25, h=0.04, lwd=1, col=black)
+b4 <- bracketsGrob(0.91, 0.21, 0.91, 0.15, h=0.04, lwd=1, col=black)
+
+p_final <- p + 
+  annotation_custom(b1)+ 
+  annotation_custom(b2)+ 
+  annotation_custom(b3)+
+  annotation_custom(b4) 
+
+
+p_final
+
+ggsave("output/dubois_20210217.png", type = "cairo", width = 8, height = 6.5)
+```
+
+
+
+
