@@ -120,7 +120,7 @@ p <- ggplot(plot_df) +
       y=cum_percent, 
       yend=next_cum_percent
       ), 
-    color = "#222222", size = 0.5) +
+    color = black, size = 0.25, linetype="dashed") +
   # legend
   geom_col(
     data = category_labels, 
@@ -135,7 +135,7 @@ p <- ggplot(plot_df) +
       y=cum_percent, 
       yend=next_cum_percent
       ), 
-    color = black, size = 0.5
+    color = black, size = 0.25, linetype="dashed"
     ) +
   # axis labels
   geom_segment(
@@ -177,7 +177,7 @@ p <- ggplot(plot_df) +
   annotate("text", x=n+1.1+0.5*width, y=0.9, label="OTHER EXPENSES\nAND SAVINGS.", lineheight=0.8) +
   annotate("text", x=n+3, y=(1.08+left)/2, lineheight=2, size = 7, hjust = 0.5,
            label="\nINCOME AND EXPENDITURE OF 150 NEGRO FAMILIES IN ATLANTA, GA., U.S.A.") + 
-  annotate("text", x=-1, y=1, lineheight=2, hjust=1,
+  annotate("text", x=-1, y=(1.08+left)/2, lineheight=2, hjust=0.5,
            label="Source: W.E.B. Du Bois | #DuBoisChallenge | #TidyTuesday | @marisalyn\n") +
   # colors and theme
   scale_fill_manual(
