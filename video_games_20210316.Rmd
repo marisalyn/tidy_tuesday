@@ -27,14 +27,14 @@ oatbf <- games %>%
 assertthat::assert_that(length(unique(oatbf$gamename)) == 1)
 ```
 
-```{r}
-title <- "<span> Enrollment of <span style = 'color: #222222'>**Black**</span> and <span style = 'color: #D4AF37'>**non-black**</span> students at HBCUs </span>"
-
+```{r, fig.width =7}
 caption <- "\n\nSource: Steam | #TidyTuesday | Viz: @marisalyn"
 
-title <- "<span> Average number of players of <span style = 'color: #FE5D29'>Ori and the Blind Forest: Definitive Edition</span> on Steam</span>"
+title <- "Ori and the Blind Forest: Definitive Edition"
 
-subtitle <- ""
+subtitle <- "Average number of concurrent players of on Steam, by month"
+
+label <- str_wrap("The average number of concurrent players peaked in March 2020, coninciding with the release date of the game's sequel, Ori and the Will of the Wisps, and global lockdowns due to the COVID-19 pandemic", 50)
 
 orange <- "#E04C28"
 purple <- "#905D95"
@@ -53,15 +53,35 @@ ggplot(oatbf) +
     color = orange, 
     fill = light_blue,
     shape = 21,
-    stroke = 2,
-    size = 2
+    stroke = 1.5,
+    size = 1.5
   ) + 
+  annotate(
+    "label", x = ymd("2018-06-01"), y = 1500, label = label, 
+    hjust = 0.5, 
+    lineheight = 1, 
+    fill = light_blue,
+    label.size = NA,
+    size = 3.3, 
+    family = "Segoe UI", 
+    color = purple
+    ) + 
+  annotate(
+    "curve", x = ymd("2019-01-01"), y = 1750, 
+    xend = ymd("2020-02-01"), yend = max(oatbf$avg),
+    colour = purple,
+    size = 0.8,
+    curvature = -0.2,
+    arrow = arrow(length = unit(0.03, "npc"), type = "closed"),
+    inherit.aes = FALSE
+    ) + 
   labs(title = title, subtitle = subtitle, caption = caption) + 
   scale_y_continuous(labels = scales::comma) +
   theme_minimal(base_family = "Segoe UI", base_size = 12) + 
   theme(
-    plot.title = element_markdown(color = purple), 
-    plot.caption = element_markdown(color = purple), 
+    plot.title = element_text(color = orange, face = "bold"), 
+    plot.subtitle = element_text(color = blue, face = "italic", size = 10),
+    plot.caption = element_text(color = blue), 
     axis.title = element_blank(),
     axis.text = element_text(color = blue),
     panel.grid = element_line(color = mid_blue),
@@ -69,6 +89,9 @@ ggplot(oatbf) +
     panel.background = element_rect(color=light_blue, fill=light_blue),
     plot.background = element_rect(color=light_blue, fill=light_blue)
   )
+
+ggsave(file.path("./output", "steam_20210317.png"), 
+       dpi = 300, width = 7.5, height = 4, type = "cairo")
 ```
 
 
