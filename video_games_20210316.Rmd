@@ -1,0 +1,74 @@
+---
+title: "Video games"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(ggtext)
+extrafont::loadfonts(device = "win", quiet = T)
+
+games <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-16/games.csv')
+
+
+```
+
+```{r}
+summary(games)
+```
+
+```{r}
+oatbf <- games %>%
+  filter(grepl("blind forest", tolower(gamename))) %>%
+  mutate(ym = ymd(paste0(year, month, 1)))
+
+assertthat::assert_that(length(unique(oatbf$gamename)) == 1)
+```
+
+```{r}
+title <- "<span> Enrollment of <span style = 'color: #222222'>**Black**</span> and <span style = 'color: #D4AF37'>**non-black**</span> students at HBCUs </span>"
+
+caption <- "\n\nSource: Steam | #TidyTuesday | Viz: @marisalyn"
+
+title <- "<span> Average number of players of <span style = 'color: #FE5D29'>Ori and the Blind Forest: Definitive Edition</span> on Steam</span>"
+
+subtitle <- ""
+
+orange <- "#E04C28"
+purple <- "#905D95"
+blue <- "#3F5A85"
+mid_blue <- "#d3dbe6"
+light_blue <- "#F5FCFF"
+
+ggplot(oatbf) +
+  geom_line(
+    aes(x = ym, y = avg), 
+    color = orange, 
+    size = 1.5
+    ) + 
+  geom_point(
+    aes(x = ym, y = avg), 
+    color = orange, 
+    fill = light_blue,
+    shape = 21,
+    stroke = 2,
+    size = 2
+  ) + 
+  labs(title = title, subtitle = subtitle, caption = caption) + 
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal(base_family = "Segoe UI", base_size = 12) + 
+  theme(
+    plot.title = element_markdown(color = purple), 
+    plot.caption = element_markdown(color = purple), 
+    axis.title = element_blank(),
+    axis.text = element_text(color = blue),
+    panel.grid = element_line(color = mid_blue),
+    panel.grid.minor.x = element_blank(),
+    panel.background = element_rect(color=light_blue, fill=light_blue),
+    plot.background = element_rect(color=light_blue, fill=light_blue)
+  )
+```
+
+
