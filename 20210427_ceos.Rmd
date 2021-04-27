@@ -1,0 +1,86 @@
+---
+title: "20210427_ceos"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggtext)
+library(patchwork)
+df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-04-27/departures.csv')
+```
+
+```{r}
+dark_grey <- "#4D525A"
+grey <- "#8F9CB3"
+blue <- "#003f5c"
+orange <- "#ff6361"
+extrafont::loadfonts(device = "win", quiet = T)
+```
+
+```{r}
+df_clean <- df %>%
+  mutate(
+    still_there = lubridate::dmy(still_there), 
+    interim = case_when(
+      tolower(interim_coceo) == "interim" ~ "Interim CEO",
+      TRUE ~ "Not interim"
+    )) %>%
+  select(coname, gvkey, fyear, still_there, interim) %>%
+  group_by(gvkey) %>% 
+  arrange(gvkey, fyear) %>%
+  mutate(tenure = case_when(
+    is.na(still_there) ~ -1*(fyear - lead(fyear, 1)),
+    TRUE ~ lubridate::year(still_there) - fyear
+  )) %>%
+  filter(!is.na(tenure)) %>%
+  ungroup()
+
+p <- ggplot(df_clean) + 
+  geom_bar(aes(x=tenure, fill=interim)) +
+  scale_x_continuous(breaks = seq(0, 30, 5)) + 
+  scale_y_continuous(labels = scales::comma)+
+  scale_fill_manual(values = c(orange, blue), name = "") + 
+  theme_minimal(base_family = "Segoe UI") + 
+  theme(
+    legend.position = "none", 
+    axis.text = element_text(size = 10, color = grey), 
+    axis.title = element_blank(),
+    panel.grid.major = element_line(color = paste0(grey, "80")),
+    panel.grid.minor = element_blank(),
+    axis.ticks = element_line(color = paste0(grey, "80"), size = 0.5), 
+    axis.ticks.length = unit(.2, "cm"), 
+    plot.margin = margin(10, 10, 10, 30)
+    )
+
+md_tenure <- median(df_clean$tenure)
+md_tenure_no_interim <- df_clean %>%
+  filter(interim != "Interim CEO") %>%
+  summarize(median(tenure)) %>% pull()
+avg_tenure <- mean(df_clean$tenure)
+avg_tenure_no_interim <- df_clean %>%
+  filter(interim != "Interim CEO") %>%
+  summarize(mean(tenure)) %>% pull()
+
+final_plot <- p + plot_annotation(
+  title = "<span>**CEO tenure at S&P 1500 firms**</span>",
+  subtitle = paste0(
+    "<span>Based on data collected by Gentry et al. (2021) on  CEO departure from 
+    S&P 1500 firms since 2000, CEOs <br>have an average tenure of ", 
+    round(avg_tenure, 1), " years and the median tenure is just ",
+    md_tenure_no_interim, 
+    " years,even when excluding 
+    <span style='color:#ff6361;'>**interim CEOs.**</span></span>"), 
+  caption = "<br> Source: Gentry et al. (2021) | #TidyTuesday | Viz: @marisalyn", 
+  theme = theme(
+    plot.title = element_markdown(family = "Segoe UI", size = 18, color = blue), 
+    plot.subtitle = element_markdown(family = "Segoe UI", size = 10, color = blue, lineheight = 1.3), 
+    plot.caption = element_markdown(family = "Segoe UI", size = 9, color = grey)
+    )
+)
+
+ggsave("output/20210427_ceo_tenure.png", plot = final_plot, type = "cairo", 
+       width = 7.5, height = 5, units = "in")
+```
+
