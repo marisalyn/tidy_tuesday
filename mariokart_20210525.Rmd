@@ -26,7 +26,7 @@ lakitu <- get_png("input/Lakitu.png")
 grey <- "#333333"
 blue <- "#0000FF"
 font <- "Copperplate Gothic Bold"
-
+font2 <- "Garamond"
 rr <- records %>%
   filter(type == "Three Lap", track=="Rainbow Road") 
 
@@ -45,7 +45,7 @@ ggplot() +
   geom_star(
     data = filter(rr, shortcut == "No"), 
     aes(x = date, y = time, group=shortcut), 
-    color = grey,  size = 2.1, stroke=1.3, fill="white", starshape = 1
+    color = grey,  size = 2.1, fill="white", starshape = 1
     ) +
   geom_line(
     data = filter(rr, shortcut == "Yes"), 
@@ -55,13 +55,13 @@ ggplot() +
   geom_star(
     data = filter(rr, shortcut == "Yes"), 
     aes(x = date, y = time, color = date, group=shortcut), 
-    size = 2.1, stroke=1.3, fill="white", starshape = 1
+    size = 2.1, fill="white", starshape = 1
     ) +
   annotate(
     "label", 
     x = ymd("2019-01-01"), 
     y = max(filter(rr, shortcut == "No", date >= ymd("20170101"))$time) + 25, 
-    label = "Without shortcuts", family=font,
+    label = "Without shortcuts", family=font2,
     hjust = 1, lineheight = 1, 
     fill = "white",label.size = NA,size = 3.3, color = grey
     ) + 
@@ -69,13 +69,13 @@ ggplot() +
     "label", 
     x = ymd("2019-01-01"), 
     y = max(filter(rr, shortcut == "Yes", date >= ymd("20170101"))$time) + 25, 
-    label = "With shortcuts", family=font,
+    label = "With shortcuts", family=font2,
     hjust = 1, lineheight = 1, 
     fill = "white", label.size = NA,size = 3.3, color = blue
     ) + 
   annotation_custom(
     lakitu, 
-    xmin = ymd("2018-01-01"), xmax = ymd("2021-01-01"), 
+    xmin = ymd("2019-01-01"), xmax = ymd("2022-01-01"), 
     ymin = 390, ymax = 520
     ) + 
   coord_cartesian(clip="off") + 
@@ -88,14 +88,14 @@ ggplot() +
     title = "FINISH! N64 Rainbow Road World Records", 
     subtitle = subtitle
     ) + 
-  theme_minimal(base_family = font) + 
+  theme_minimal(base_family = font2) + 
   theme(
     legend.position = "none", 
-    plot.subtitle = element_text(family = "Garamond", color=grey, size =8), 
-    axis.text = element_text(size = 6, color= grey), 
-    axis.text.x = element_text(angle=90, vjust = 0.5),
-    axis.title = element_text(color=grey), 
-    plot.title = element_text(color=grey)
+    plot.title = element_text(family = font, color=grey), 
+    plot.subtitle = element_text(color=grey, size =8), 
+    axis.text = element_text(size = 8, color= grey), 
+    axis.title = element_text(size=8, color=grey),
+    axis.text.x = element_text(angle=90, vjust = 0.5)
     )
 
 ggsave(file.path("./output", "20210527_mariokart.png"), 
