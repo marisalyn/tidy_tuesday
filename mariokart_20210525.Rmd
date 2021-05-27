@@ -84,14 +84,16 @@ ggplot() +
   labs(
     x = "", 
     y = "Time (seconds)\n",
-    title = "FINISH! N64 Rainbow Road World Records", 
-    subtitle = subtitle
+    title = "FINISH! Mario Kart 64 Rainbow Road World Records", 
+    subtitle = subtitle, 
+    caption = "Source: Mario Kart World Records | #TidyTuesday | Viz: @marisalyn"
     ) + 
   theme_minimal(base_family = font2) + 
   theme(
     legend.position = "none", 
     plot.title = element_text(family = font, color=grey), 
     plot.subtitle = element_text(color=grey, size =8), 
+    plot.caption = element_text(color=grey, size =8), 
     axis.text = element_text(size = 8, color= grey), 
     axis.title = element_text(size=8, color=grey),
     axis.text.x = element_text(angle=90, vjust = 0.5)
