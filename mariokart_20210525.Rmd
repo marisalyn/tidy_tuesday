@@ -35,7 +35,6 @@ subtitle <- paste0("New shortcuts discovered in Mario Kart's longest track, Rain
                    "minutes without shortcuts to just ", min(rr$time), " seconds.")
 
 
-
 ggplot() + 
   geom_line(
     data = filter(rr, shortcut == "No"), 
